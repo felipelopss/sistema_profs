@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, GraduationCap, Users, Clock } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, GraduationCap, Users, Clock, BookOpen } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { Class } from '../../types';
 
