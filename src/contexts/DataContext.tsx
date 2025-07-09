@@ -553,6 +553,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date()
     };
     setTeachers(prev => [...prev, newTeacher]);
+    
+    // Notificar que um novo professor foi criado
+    console.log('✅ Novo professor criado:', newTeacher.name, newTeacher.email);
   };
 
   const updateTeacher = (id: string, data: Partial<User>) => {

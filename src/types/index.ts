@@ -6,6 +6,7 @@ export interface User {
   registrationNumber?: string;
   phone?: string;
   subjects?: string[];
+  password?: string; // Senha para login
   // Novas propriedades para restrições e preferências
   restrictions?: TeacherRestriction[];
   preferences?: TeacherPreference[];

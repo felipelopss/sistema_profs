@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import { useData } from './DataContext';
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +21,7 @@ const systemUsers: User[] = [
     role: 'admin',
     phone: '(11) 99999-0001',
     registrationNumber: 'ADM001',
+    password: '123456',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date()
   },
@@ -31,6 +33,7 @@ const systemUsers: User[] = [
     registrationNumber: 'PROF001',
     phone: '(11) 99999-0002',
     subjects: ['1', '2'], // IDs das disciplinas que leciona
+    password: '123456',
     createdAt: new Date('2024-01-15'),
     updatedAt: new Date()
   },
@@ -42,6 +45,7 @@ const systemUsers: User[] = [
     registrationNumber: 'PROF002',
     phone: '(11) 99999-0003',
     subjects: ['3', '4'],
+    password: '123456',
     createdAt: new Date('2024-02-01'),
     updatedAt: new Date()
   },
@@ -53,6 +57,7 @@ const systemUsers: User[] = [
     registrationNumber: 'PROF003',
     phone: '(11) 99999-0004',
     subjects: ['5', '6'],
+    password: '123456',
     createdAt: new Date('2024-02-15'),
     updatedAt: new Date()
   },
@@ -64,6 +69,7 @@ const systemUsers: User[] = [
     registrationNumber: 'PROF004',
     phone: '(11) 99999-0005',
     subjects: ['7', '8'],
+    password: '123456',
     createdAt: new Date('2024-03-01'),
     updatedAt: new Date()
   }
@@ -72,7 +78,44 @@ const systemUsers: User[] = [
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [teachers, setTeachers] = useState<User[]>([]);
 
+  // Carregar professores cadastrados do localStorage
+  useEffect(() => {
+    const loadTeachers = () => {
+      try {
+        const savedTeachers = localStorage.getItem('sighe_teachers');
+        if (savedTeachers) {
+          const parsedTeachers = JSON.parse(savedTeachers, (key, value) => {
+            if (value && typeof value === 'object' && value.__type === 'Date') {
+              return new Date(value.value);
+            }
+            return value;
+          });
+          setTeachers(parsedTeachers);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar professores:', error);
+      }
+    };
+
+    loadTeachers();
+    
+    // Escutar mudanças no localStorage
+    const handleStorageChange = () => {
+      loadTeachers();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Verificar mudanças periodicamente (para mudanças na mesma aba)
+    const interval = setInterval(loadTeachers, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
   useEffect(() => {
     // Verificar se há usuário logado no localStorage
     const savedUser = localStorage.getItem('sighe_current_user');
@@ -94,11 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Simular delay de autenticação
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Buscar usuário no sistema
-    const foundUser = systemUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // Buscar primeiro nos usuários do sistema (admin e professores padrão)
+    let foundUser = systemUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
     
-    // Verificar credenciais (senha padrão: 123456)
-    if (foundUser && password === '123456') {
+    // Se não encontrou, buscar nos professores cadastrados
+    if (!foundUser) {
+      foundUser = teachers.find(u => 
+        u.email.toLowerCase() === email.toLowerCase() && 
+        u.role === 'teacher'
+      );
+    }
+    
+    // Verificar credenciais
+    if (foundUser && ((foundUser as any).password === password || (!foundUser.password && password === '123456'))) {
       const userWithTimestamp = {
         ...foundUser,
         lastLogin: new Date()

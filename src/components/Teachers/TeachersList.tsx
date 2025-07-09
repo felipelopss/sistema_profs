@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Mail, Phone, BookOpen, User } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Mail, Phone, BookOpen, User, Key } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { User as UserType } from '../../types';
 
 export default function TeachersList() {
   const { teachers, subjects, createTeacher, updateTeacher, deleteTeacher } = useData();
   const [showForm, setShowForm] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<UserType | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<UserType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [formData, setFormData] = useState({
@@ -15,7 +17,14 @@ export default function TeachersList() {
     phone: '',
     registrationNumber: '',
     subjects: [] as string[],
-    role: 'teacher' as const
+    role: 'teacher' as const,
+    password: '',
+    confirmPassword: ''
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    password: '',
+    confirmPassword: ''
   });
 
   const teachersList = teachers.filter(t => t.role === 'teacher');
@@ -34,9 +43,27 @@ export default function TeachersList() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validar senha para novos professores
+    if (!editingTeacher) {
+      if (!formData.password || formData.password.length < 6) {
+        alert('A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      
+      if (formData.password !== formData.confirmPassword) {
+        alert('As senhas não coincidem.');
+        return;
+      }
+    }
+
     const teacherData = {
-      ...formData,
-      subjects: formData.subjects
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      registrationNumber: formData.registrationNumber,
+      subjects: formData.subjects,
+      role: formData.role,
+      ...(formData.password && { password: formData.password })
     };
 
     if (editingTeacher) {
@@ -53,8 +80,37 @@ export default function TeachersList() {
       phone: '',
       registrationNumber: '',
       subjects: [],
-      role: 'teacher'
+      role: 'teacher',
+      password: '',
+      confirmPassword: ''
     });
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedTeacher) return;
+    
+    if (!passwordData.password || passwordData.password.length < 6) {
+      alert('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    
+    if (passwordData.password !== passwordData.confirmPassword) {
+      alert('As senhas não coincidem.');
+      return;
+    }
+
+    updateTeacher(selectedTeacher.id, { password: passwordData.password });
+    
+    setShowPasswordForm(false);
+    setSelectedTeacher(null);
+    setPasswordData({
+      password: '',
+      confirmPassword: ''
+    });
+    
+    alert('Senha definida com sucesso! O professor já pode fazer login no sistema.');
   };
 
   const handleEdit = (teacher: UserType) => {
@@ -65,9 +121,16 @@ export default function TeachersList() {
       phone: teacher.phone || '',
       registrationNumber: teacher.registrationNumber || '',
       subjects: teacher.subjects || [],
-      role: 'teacher'
+      role: 'teacher',
+      password: '',
+      confirmPassword: ''
     });
     setShowForm(true);
+  };
+
+  const handleSetPassword = (teacher: UserType) => {
+    setSelectedTeacher(teacher);
+    setShowPasswordForm(true);
   };
 
   const handleDelete = (id: string) => {
@@ -200,6 +263,38 @@ export default function TeachersList() {
                 </div>
               </div>
 
+              {!editingTeacher && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Senha
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirmar Senha
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Confirme a senha"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Disciplinas que Leciona
@@ -242,7 +337,73 @@ export default function TeachersList() {
                       phone: '',
                       registrationNumber: '',
                       subjects: [],
-                      role: 'teacher'
+                      role: 'teacher',
+                      password: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password Form Modal */}
+      {showPasswordForm && selectedTeacher && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Definir Senha - {selectedTeacher.name}
+            </h3>
+            
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nova Senha
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.password}
+                  onChange={(e) => setPasswordData({ ...passwordData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar Senha
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Confirme a senha"
+                  required
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors"
+                >
+                  Definir Senha
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    setSelectedTeacher(null);
+                    setPasswordData({
+                      password: '',
+                      confirmPassword: ''
                     });
                   }}
                   className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
@@ -270,9 +431,16 @@ export default function TeachersList() {
                   <p className="text-xs text-gray-500">ID: {teacher.id}</p>
                 </div>
               </div>
-              <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                Ativo
-              </span>
+              <div className="flex flex-col space-y-1">
+                <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 text-center">
+                  Ativo
+                </span>
+                {(teacher as any).password && (
+                  <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 text-center">
+                    Login OK
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2 mb-4">
@@ -313,6 +481,13 @@ export default function TeachersList() {
             )}
 
             <div className="flex items-center justify-end space-x-2 pt-4 border-t border-gray-200">
+              <button 
+                onClick={() => handleSetPassword(teacher)}
+                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                title="Definir Senha"
+              >
+                <Key className="w-4 h-4" />
+              </button>
               <button 
                 onClick={() => handleEdit(teacher)}
                 className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
