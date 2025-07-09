@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { DataProvider } from './contexts/DataContext';
+import { SupabaseDataProvider } from './contexts/SupabaseDataContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginForm from './components/Auth/LoginForm';
 import Sidebar from './components/Layout/Sidebar';
@@ -114,11 +114,11 @@ function AppContent() {
 function App() {
   return (
     <Router>
-        <DataProvider>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </DataProvider>
+      <SupabaseDataProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </SupabaseDataProvider>
     </Router>
   );
 }

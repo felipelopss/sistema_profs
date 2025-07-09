@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, Mail, Phone, BookOpen, User, Key } from 'lucide-react';
-import { useData } from '../../contexts/DataContext';
+import { useSupabaseDataContext } from '../../contexts/SupabaseDataContext';
 import { User as UserType } from '../../types';
 
 export default function TeachersList() {
-  const { teachers, subjects, createTeacher, updateTeacher, deleteTeacher } = useData();
+  const { teachers, subjects, createTeacher, updateTeacher, deleteTeacher, isLoading } = useSupabaseDataContext();
   const [showForm, setShowForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<UserType | null>(null);
@@ -40,77 +40,87 @@ export default function TeachersList() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar senha para novos professores
-    if (!editingTeacher) {
-      if (!formData.password || formData.password.length < 6) {
-        alert('A senha deve ter pelo menos 6 caracteres.');
-        return;
+    try {
+      // Validar senha para novos professores
+      if (!editingTeacher) {
+        if (!formData.password || formData.password.length < 6) {
+          alert('A senha deve ter pelo menos 6 caracteres.');
+          return;
+        }
+        
+        if (formData.password !== formData.confirmPassword) {
+          alert('As senhas não coincidem.');
+          return;
+        }
       }
-      
-      if (formData.password !== formData.confirmPassword) {
-        alert('As senhas não coincidem.');
-        return;
+
+      const teacherData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        registrationNumber: formData.registrationNumber,
+        subjects: formData.subjects,
+        role: formData.role,
+        ...(formData.password && { password: formData.password })
+      };
+
+      if (editingTeacher) {
+        await updateTeacher(editingTeacher.id, teacherData);
+      } else {
+        await createTeacher(teacherData);
       }
+
+      setShowForm(false);
+      setEditingTeacher(null);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        registrationNumber: '',
+        subjects: [],
+        role: 'teacher',
+        password: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      console.error('Erro ao salvar professor:', error);
+      alert('Erro ao salvar professor. Tente novamente.');
     }
-
-    const teacherData = {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      registrationNumber: formData.registrationNumber,
-      subjects: formData.subjects,
-      role: formData.role,
-      ...(formData.password && { password: formData.password })
-    };
-
-    if (editingTeacher) {
-      updateTeacher(editingTeacher.id, teacherData);
-    } else {
-      createTeacher(teacherData);
-    }
-
-    setShowForm(false);
-    setEditingTeacher(null);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      registrationNumber: '',
-      subjects: [],
-      role: 'teacher',
-      password: '',
-      confirmPassword: ''
-    });
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedTeacher) return;
     
-    if (!passwordData.password || passwordData.password.length < 6) {
-      alert('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-    
-    if (passwordData.password !== passwordData.confirmPassword) {
-      alert('As senhas não coincidem.');
-      return;
-    }
+    try {
+      if (!passwordData.password || passwordData.password.length < 6) {
+        alert('A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      
+      if (passwordData.password !== passwordData.confirmPassword) {
+        alert('As senhas não coincidem.');
+        return;
+      }
 
-    updateTeacher(selectedTeacher.id, { password: passwordData.password });
-    
-    setShowPasswordForm(false);
-    setSelectedTeacher(null);
-    setPasswordData({
-      password: '',
-      confirmPassword: ''
-    });
-    
-    alert('Senha definida com sucesso! O professor já pode fazer login no sistema.');
+      await updateTeacher(selectedTeacher.id, { password: passwordData.password });
+      
+      setShowPasswordForm(false);
+      setSelectedTeacher(null);
+      setPasswordData({
+        password: '',
+        confirmPassword: ''
+      });
+      
+      alert('Senha definida com sucesso! O professor já pode fazer login no sistema.');
+    } catch (error) {
+      console.error('Erro ao definir senha:', error);
+      alert('Erro ao definir senha. Tente novamente.');
+    }
   };
 
   const handleEdit = (teacher: UserType) => {
@@ -133,9 +143,14 @@ export default function TeachersList() {
     setShowPasswordForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este professor?')) {
-      deleteTeacher(id);
+      try {
+        await deleteTeacher(id);
+      } catch (error) {
+        console.error('Erro ao excluir professor:', error);
+        alert('Erro ao excluir professor. Tente novamente.');
+      }
     }
   };
 
@@ -152,6 +167,14 @@ export default function TeachersList() {
     const subject = subjects.find(s => s.id === subjectId);
     return subject?.name || subjectId;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -435,7 +458,7 @@ export default function TeachersList() {
                 <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 text-center">
                   Ativo
                 </span>
-                {(teacher as any).password && (
+                {teacher.password && (
                   <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 text-center">
                     Login OK
                   </span>
