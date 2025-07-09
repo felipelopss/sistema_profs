@@ -4,8 +4,10 @@ import { useData } from '../../contexts/DataContext';
 import { Class } from '../../types';
 
 export default function ClassesList() {
-  const { classes, createClass, updateClass, deleteClass, activeAcademicYear } = useData();
+  const { classes, createClass, updateClass, deleteClass, activeAcademicYear, subjects, teachers, classSubjects, createClassSubject, updateClassSubject, deleteClassSubject } = useData();
   const [showForm, setShowForm] = useState(false);
+  const [showSubjectsForm, setShowSubjectsForm] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterShift, setFilterShift] = useState<'all' | 'morning' | 'afternoon' | 'full'>('all');
@@ -16,6 +18,11 @@ export default function ClassesList() {
     studentsCount: 0
   });
 
+  const [subjectFormData, setSubjectFormData] = useState({
+    subjectId: '',
+    teacherId: '',
+    weeklyHours: 1
+  });
   const filteredClasses = classes.filter(cls => {
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.grade.toLowerCase().includes(searchTerm.toLowerCase());
@@ -25,6 +32,19 @@ export default function ClassesList() {
     return matchesSearch && matchesShift && matchesYear;
   });
 
+  const getClassSubjects = (classId: string) => {
+    return classSubjects.filter(cs => cs.classId === classId);
+  };
+
+  const getSubjectName = (subjectId: string) => {
+    const subject = subjects.find(s => s.id === subjectId);
+    return subject?.name || 'Disciplina não encontrada';
+  };
+
+  const getTeacherName = (teacherId: string) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    return teacher?.name || 'Professor não encontrado';
+  };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -54,6 +74,49 @@ export default function ClassesList() {
     });
   };
 
+  const handleSubjectSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedClass || !activeAcademicYear) return;
+
+    // Verificar se já existe essa associação
+    const existingAssociation = classSubjects.find(cs => 
+      cs.classId === selectedClass.id && 
+      cs.subjectId === subjectFormData.subjectId
+    );
+
+    if (existingAssociation) {
+      alert('Esta disciplina já está associada a esta turma.');
+      return;
+    }
+
+    createClassSubject({
+      classId: selectedClass.id,
+      subjectId: subjectFormData.subjectId,
+      teacherId: subjectFormData.teacherId,
+      weeklyHours: subjectFormData.weeklyHours,
+      weeklyClasses: subjectFormData.weeklyHours,
+      academicYear: activeAcademicYear.id,
+      priority: 1
+    });
+
+    setSubjectFormData({
+      subjectId: '',
+      teacherId: '',
+      weeklyHours: 1
+    });
+  };
+
+  const handleManageSubjects = (cls: Class) => {
+    setSelectedClass(cls);
+    setShowSubjectsForm(true);
+  };
+
+  const handleRemoveSubject = (classSubjectId: string) => {
+    if (confirm('Tem certeza que deseja remover esta disciplina da turma?')) {
+      deleteClassSubject(classSubjectId);
+    }
+  };
   const handleEdit = (cls: Class) => {
     setEditingClass(cls);
     setFormData({
@@ -246,6 +309,127 @@ export default function ClassesList() {
         </div>
       )}
 
+      {/* Subjects Management Modal */}
+      {showSubjectsForm && selectedClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Disciplinas da Turma: {selectedClass.name}
+            </h3>
+            
+            {/* Current Subjects */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-gray-900 mb-3">Disciplinas Atuais</h4>
+              <div className="space-y-2">
+                {getClassSubjects(selectedClass.id).map((cs) => (
+                  <div key={cs.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <BookOpen className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="font-medium text-gray-900">{getSubjectName(cs.subjectId)}</p>
+                          <p className="text-sm text-gray-600">
+                            Professor: {cs.teacherId ? getTeacherName(cs.teacherId) : 'Não definido'} | 
+                            {cs.weeklyHours}h/semana
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveSubject(cs.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {getClassSubjects(selectedClass.id).length === 0 && (
+                  <p className="text-gray-500 text-center py-4">Nenhuma disciplina associada</p>
+                )}
+              </div>
+            </div>
+
+            {/* Add New Subject */}
+            <div className="border-t border-gray-200 pt-6">
+              <h4 className="text-md font-medium text-gray-900 mb-3">Adicionar Disciplina</h4>
+              <form onSubmit={handleSubjectSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Disciplina
+                  </label>
+                  <select
+                    value={subjectFormData.subjectId}
+                    onChange={(e) => setSubjectFormData({ ...subjectFormData, subjectId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Selecione uma disciplina</option>
+                    {subjects.map(subject => (
+                      <option key={subject.id} value={subject.id}>{subject.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Professor
+                  </label>
+                  <select
+                    value={subjectFormData.teacherId}
+                    onChange={(e) => setSubjectFormData({ ...subjectFormData, teacherId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Selecione um professor</option>
+                    {teachers.filter(t => t.role === 'teacher').map(teacher => (
+                      <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Carga Horária Semanal
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={subjectFormData.weeklyHours}
+                    onChange={(e) => setSubjectFormData({ ...subjectFormData, weeklyHours: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Adicionar Disciplina
+                </button>
+              </form>
+            </div>
+
+            <div className="flex justify-end pt-6 border-t border-gray-200 mt-6">
+              <button
+                onClick={() => {
+                  setShowSubjectsForm(false);
+                  setSelectedClass(null);
+                  setSubjectFormData({
+                    subjectId: '',
+                    teacherId: '',
+                    weeklyHours: 1
+                  });
+                }}
+                className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Classes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredClasses.map((cls) => (
@@ -263,6 +447,13 @@ export default function ClassesList() {
               </div>
               
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleManageSubjects(cls)}
+                  className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  title="Gerenciar Disciplinas"
+                >
+                  <BookOpen className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => handleEdit(cls)}
                   className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -286,6 +477,13 @@ export default function ClassesList() {
                 </span>
               </div>
 
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Disciplinas:</span>
+                <div className="flex items-center space-x-1">
+                  <BookOpen className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900">{getClassSubjects(cls.id).length}</span>
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Alunos:</span>
                 <div className="flex items-center space-x-1">
